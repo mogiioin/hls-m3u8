@@ -15,6 +15,10 @@ import (
 	"time"
 )
 
+var ErrExtM3UAbsent = errors.New("#EXTM3U absent")
+var ErrNotYesOrNo = errors.New("value must be YES or NO")
+var ErrCannotDetectPlaylistType = errors.New("cannot detect playlist type")
+
 var reKeyValue = regexp.MustCompile(`([a-zA-Z0-9_-]+)=("[^"]+"|[^",]+)`)
 
 // TimeParse allows globally apply and/or override Time Parser function.
@@ -76,7 +80,7 @@ func (p *MasterPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 	p.attachRenditionsToVariants(state.alternatives)
 
 	if strict && !state.m3u {
-		return errors.New("#EXTM3U absent")
+		return ErrExtM3UAbsent
 	}
 	return nil
 }
@@ -148,7 +152,6 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 			break
 		}
 		line = trimLineEnd(line)
-
 		err = decodeLineOfMediaPlaylist(p, wv, state, line, strict)
 		if strict && err != nil {
 			return err
@@ -159,7 +162,7 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 		p.WV = wv
 	}
 	if strict && !state.m3u {
-		return errors.New("#EXTM3U absent")
+		return ErrExtM3UAbsent
 	}
 	return nil
 }
@@ -195,7 +198,7 @@ func DecodeWith(input interface{}, strict bool, customDecoders []CustomDecoder) 
 		}
 		return decode(buf, strict, customDecoders)
 	default:
-		return nil, 0, errors.New("input must be bytes.Buffer or io.Reader type")
+		return nil, 0, fmt.Errorf("input must be bytes.Buffer or io.Reader type, got %T", input)
 	}
 }
 
@@ -215,7 +218,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	master = NewMasterPlaylist()
 	media, err = NewMediaPlaylist(8, 1024) // Winsize for VoD will become 0, capacity auto extends
 	if err != nil {
-		return nil, 0, fmt.Errorf("Create media playlist failed: %s", err)
+		return nil, 0, fmt.Errorf("create media playlist failed: %w", err)
 	}
 
 	// If we have custom tags to parse
@@ -250,7 +253,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 	}
 
 	if strict && !state.m3u {
-		return nil, listType, errors.New("#EXTM3U absent")
+		return nil, listType, ErrExtM3UAbsent
 	}
 
 	switch state.listType {
@@ -263,7 +266,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 		}
 		return media, MEDIA, nil
 	}
-	return nil, state.listType, errors.New("Can't detect playlist type")
+	return nil, state.listType, ErrCannotDetectPlaylistType
 }
 
 // DecodeAttributeList turns an attribute list into a key, value map. You should trim
@@ -325,13 +328,11 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 			case "NAME":
 				alt.Name = v
 			case "DEFAULT":
-				if strings.ToUpper(v) == "YES" {
-					alt.Default = true
-				} else if strings.ToUpper(v) == "NO" {
-					alt.Default = false
-				} else if strict {
-					return errors.New("value must be YES or NO")
+				value, err := yesOrNo(v, strict)
+				if err != nil {
+					return fmt.Errorf("%s:%s %w", k, v, ErrNotYesOrNo)
 				}
+				alt.Default = value
 			case "AUTOSELECT":
 				alt.Autoselect = v
 			case "FORCED":
@@ -492,7 +493,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 		duration := line[8:sepIndex]
 		if len(duration) > 0 {
 			if state.duration, err = strconv.ParseFloat(duration, 64); strict && err != nil {
-				return fmt.Errorf("Duration parsing error: %s", err)
+				return fmt.Errorf("duration parsing error: %w", err)
 			}
 		}
 		if len(line) > sepIndex {
@@ -617,7 +618,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 			case "TIME-OFFSET":
 				st, err := strconv.ParseFloat(v, 64)
 				if err != nil {
-					return fmt.Errorf("Invalid TIME-OFFSET: %s: %v", v, err)
+					return fmt.Errorf("invalid TIME-OFFSET: %s: %w", v, err)
 				}
 				p.StartTime = st
 			case "PRECISE":
@@ -651,7 +652,7 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 				state.xmap.URI = v
 			case "BYTERANGE":
 				if _, err = fmt.Sscanf(v, "%d@%d", &state.xmap.Limit, &state.xmap.Offset); strict && err != nil {
-					return fmt.Errorf("Byterange sub-range length value parsing error: %s", err)
+					return fmt.Errorf("byterange sub-range length value parsing error: %w", err)
 				}
 			}
 		}
@@ -668,11 +669,11 @@ func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, l
 		state.offset = 0
 		params := strings.SplitN(line[17:], "@", 2)
 		if state.limit, err = strconv.ParseInt(params[0], 10, 64); strict && err != nil {
-			return fmt.Errorf("Byterange sub-range length value parsing error: %s", err)
+			return fmt.Errorf("byterange sub-range length value parsing error: %w", err)
 		}
 		if len(params) > 1 {
 			if state.offset, err = strconv.ParseInt(params[1], 10, 64); strict && err != nil {
-				return fmt.Errorf("Byterange sub-range offset value parsing error: %s", err)
+				return fmt.Errorf("byterange sub-range offset value parsing error: %w ", err)
 			}
 		}
 	case !state.tagSCTE35 && strings.HasPrefix(line, "#EXT-SCTE35:"):
@@ -859,6 +860,25 @@ func FullTimeParse(value string) (time.Time, error) {
 		}
 	}
 	return t, err
+}
+
+func yesOrNo(v string, strict bool) (bool, error) {
+	if strict {
+		switch v {
+		case "YES":
+			return true, nil
+		case "NO":
+			return false, nil
+		default:
+			return false, fmt.Errorf("value %q: %w", v, ErrNotYesOrNo)
+		}
+	}
+	switch {
+	case strings.ToUpper(v) == "YES":
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 // trimLineEnd removes a trailing `\n` or `\r\n` from a string.

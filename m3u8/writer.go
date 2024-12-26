@@ -14,8 +14,9 @@ import (
 	"time"
 )
 
-// ErrPlaylistFull declares the playlist error.
 var ErrPlaylistFull = errors.New("playlist is full")
+var ErrPlaylistEmpty = errors.New("playlist is empty")
+var ErrWinSizeTooSmall = errors.New("window size must be >= capacity")
 
 // Set version of the playlist accordingly with section 7
 func version(ver *uint8, newver uint8) {
@@ -331,7 +332,7 @@ func (p *MediaPlaylist) last() uint {
 // This operation does reset playlist cache.
 func (p *MediaPlaylist) Remove() (err error) {
 	if p.count == 0 {
-		return errors.New("playlist is empty")
+		return ErrPlaylistEmpty
 	}
 	p.head = (p.head + 1) % p.capacity
 	p.count--
@@ -768,7 +769,7 @@ func (p *MediaPlaylist) SetIframeOnly() {
 // (pointer to Segment.Key).
 func (p *MediaPlaylist) SetKey(method, uri, iv, keyformat, keyformatversions string) error {
 	if p.count == 0 {
-		return errors.New("playlist is empty")
+		return ErrPlaylistEmpty
 	}
 
 	// A Media Playlist MUST indicate a EXT-X-VERSION of 5 or higher if it
@@ -786,7 +787,7 @@ func (p *MediaPlaylist) SetKey(method, uri, iv, keyformat, keyformatversions str
 // to Segment.Map).
 func (p *MediaPlaylist) SetMap(uri string, limit, offset int64) error {
 	if p.count == 0 {
-		return errors.New("playlist is empty")
+		return ErrPlaylistEmpty
 	}
 	version(&p.ver, 5) // due section 4
 	p.Segments[p.last()].Map = &Map{uri, limit, offset}
@@ -797,7 +798,7 @@ func (p *MediaPlaylist) SetMap(uri string, limit, offset int64) error {
 // (EXT-X-BYTERANGE support for protocol version 4).
 func (p *MediaPlaylist) SetRange(limit, offset int64) error {
 	if p.count == 0 {
-		return errors.New("playlist is empty")
+		return ErrPlaylistEmpty
 	}
 	version(&p.ver, 4) // due section 3.4.1
 	p.Segments[p.last()].Limit = limit
@@ -815,7 +816,7 @@ func (p *MediaPlaylist) SetSCTE(cue string, id string, time float64) error {
 // SetSCTE35 sets the SCTE cue format for the current media segment
 func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 	if p.count == 0 {
-		return errors.New("playlist is empty")
+		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].SCTE = scte35
 	return nil
@@ -828,7 +829,7 @@ func (p *MediaPlaylist) SetSCTE35(scte35 *SCTE) error {
 // parameters, encoding sequence, timestamp sequence).
 func (p *MediaPlaylist) SetDiscontinuity() error {
 	if p.count == 0 {
-		return errors.New("playlist is empty")
+		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].Discontinuity = true
 	return nil
@@ -841,7 +842,7 @@ func (p *MediaPlaylist) SetDiscontinuity() error {
 // YYYY-MM-DDThh:mm:ssZ (ISO8601) and includes time zone.
 func (p *MediaPlaylist) SetProgramDateTime(value time.Time) error {
 	if p.count == 0 {
-		return errors.New("playlist is empty")
+		return ErrPlaylistEmpty
 	}
 	p.Segments[p.last()].ProgramDateTime = value
 	return nil
@@ -861,7 +862,7 @@ func (p *MediaPlaylist) SetCustomTag(tag CustomTag) {
 // segment for its TagName.
 func (p *MediaPlaylist) SetCustomSegmentTag(tag CustomTag) error {
 	if p.count == 0 {
-		return errors.New("playlist is empty")
+		return ErrPlaylistEmpty
 	}
 
 	last := p.Segments[p.last()]
@@ -894,7 +895,7 @@ func (p *MediaPlaylist) WinSize() uint {
 // SetWinSize overwrites the playlist's window size.
 func (p *MediaPlaylist) SetWinSize(winsize uint) error {
 	if winsize > p.capacity {
-		return errors.New("capacity must be greater than winsize or equal")
+		return fmt.Errorf("capacity=%d < winsize=%d: %w", p.capacity, winsize, ErrWinSizeTooSmall)
 	}
 	p.winsize = winsize
 	return nil
