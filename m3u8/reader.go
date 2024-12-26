@@ -66,6 +66,7 @@ func (p *MasterPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 		} else if err != nil {
 			break
 		}
+		line = trimLineEnd(line)
 		err = decodeLineOfMasterPlaylist(p, state, line, strict)
 		if strict && err != nil {
 			return err
@@ -146,6 +147,7 @@ func (p *MediaPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 		} else if err != nil {
 			break
 		}
+		line = trimLineEnd(line)
 
 		err = decodeLineOfMediaPlaylist(p, wv, state, line, strict)
 		if strict && err != nil {
@@ -229,13 +231,7 @@ func decode(buf *bytes.Buffer, strict bool, customDecoders []CustomDecoder) (Pla
 		} else if err != nil {
 			break
 		}
-
-		// fixes the issues https://github.com/grafov/m3u8/issues/25
-		// TODO: the same should be done in decode functions of both Master- and MediaPlaylists
-		// so some DRYing would be needed.
-		if len(line) < 1 || line == "\r" {
-			continue
-		}
+		line = trimLineEnd(line)
 
 		err = decodeLineOfMasterPlaylist(master, state, line, strict)
 		master.attachRenditionsToVariants(state.alternatives)
@@ -288,8 +284,6 @@ func decodeParamsLine(line string) map[string]string {
 // Parse one line of master playlist.
 func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line string, strict bool) error {
 	var err error
-
-	line = strings.TrimSpace(line)
 
 	// check for custom tags first to allow custom parsing of existing tags
 	if p.Custom != nil {
@@ -463,8 +457,6 @@ func decodeLineOfMasterPlaylist(p *MasterPlaylist, state *decodingState, line st
 // Parse one line of media playlist.
 func decodeLineOfMediaPlaylist(p *MediaPlaylist, wv *WV, state *decodingState, line string, strict bool) error {
 	var err error
-
-	line = strings.TrimSpace(line)
 
 	// check for custom tags first to allow custom parsing of existing tags
 	if p.Custom != nil {
@@ -867,4 +859,18 @@ func FullTimeParse(value string) (time.Time, error) {
 		}
 	}
 	return t, err
+}
+
+// trimLineEnd removes a trailing `\n` or `\r\n` from a string.
+func trimLineEnd(line string) string {
+	l := len(line)
+	nrRemove := 0
+	if l > 0 && line[l-1] == '\n' {
+		nrRemove++
+		if l > 1 && line[l-2] == '\r' {
+			nrRemove++
+		}
+		return line[:l-nrRemove]
+	}
+	return line
 }
