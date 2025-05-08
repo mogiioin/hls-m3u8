@@ -1078,6 +1078,22 @@ func TestDecodeMediaPlaylistWithCueOutCueIn(t *testing.T) {
 	is.Equal(pp.Segments[60].SCTE.CueType, SCTE35Cue_End)   // EXT-CUE-IN must result in SCTE35Cue_End
 }
 
+func TestDecodeMediaPlaylistWithCueInAndDateRange(t *testing.T) {
+	is := is.New(t)
+	f, err := os.Open("sample-playlists/media-playlist-with-scte35-and-cue.m3u8")
+	is.NoErr(err) // must open file
+	p, listType, err := DecodeFrom(bufio.NewReader(f), true)
+	is.NoErr(err) // must decode playlist
+	pp := p.(*MediaPlaylist)
+	CheckType(t, pp)
+	is.True(len(pp.GetAllSegments()) > 0)
+	is.Equal(listType, MEDIA)                              // must be media playlist
+	is.Equal(pp.Segments[0].SCTE.CueType, SCTE35Cue_Start) // EXT-CUE-OUT must result in SCTE35Cue_Start
+	is.Equal(pp.Segments[0].SCTE.Time, 7.44)
+	is.True(len(pp.Segments[0].SCTE35DateRanges) > 0)
+	is.True(pp.Segments[3].SCTE.CueType == SCTE35Cue_End) // EXT-CUE-IN must result in SCTE35Cue_End
+}
+
 func TestDecodeMasterChannels(t *testing.T) {
 	is := is.New(t)
 	f, err := os.Open("sample-playlists/master-with-channels.m3u8")
