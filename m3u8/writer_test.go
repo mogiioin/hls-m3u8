@@ -1337,16 +1337,16 @@ func TestSegmentSliceSyncPool(t *testing.T) {
  ******************************/
 
 // Create new media playlist
-// Add two segments to media playlist
+// Add two segments, but to a window-limited list, so only the last is kept
 // Print it
 func ExampleNewMediaPlaylist_string() {
+	// Set winsize to 1 so there will be only one segment in the playlist
 	p, _ := NewMediaPlaylist(1, 2)
 	defer p.ReleasePlaylist()
 	_ = p.Append("test01.ts", 5.0, "")
 	_ = p.Append("test02.ts", 6.0, "")
 	fmt.Printf("%s\n", p)
-
-	// Skip this for now as to be discussed in a separate PR
+	// Output:
 	// #EXTM3U
 	// #EXT-X-VERSION:3
 	// #EXT-X-MEDIA-SEQUENCE:0
