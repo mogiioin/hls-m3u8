@@ -160,9 +160,36 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 		}
 	}
 
-	alts := p.GetAllAlternatives()
-	for _, alt := range alts {
-		writeExtXMedia(&p.buf, alt)
+	// Write EXT-X-MEDIA tags for all alternatives
+	// Use a map to avoid duplicates when combining both sources
+	allAlts := make(map[string]*Alternative)
+
+	// Add alternatives from the master playlist (new approach)
+	for _, alt := range p.Alternatives {
+		if alt != nil {
+			key := fmt.Sprintf("%s-%s-%s-%s", alt.GroupId, alt.Type, alt.Name, alt.Language)
+			allAlts[key] = alt
+		}
+	}
+
+	// Add alternatives from variants (legacy approach for backward compatibility)
+	for _, v := range p.Variants {
+		for _, alt := range v.Alternatives {
+			if alt != nil {
+				key := fmt.Sprintf("%s-%s-%s-%s", alt.GroupId, alt.Type, alt.Name, alt.Language)
+				allAlts[key] = alt
+			}
+		}
+	}
+
+	// Sort keys and write alternatives in a consistent order
+	keys := make([]string, 0, len(allAlts))
+	for k := range allAlts {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		writeExtXMedia(&p.buf, allAlts[key])
 	}
 
 	for _, vnt := range p.Variants {

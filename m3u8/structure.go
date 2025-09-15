@@ -169,6 +169,7 @@ type MasterPlaylist struct {
 	SessionDatas        []*SessionData   // EXT-X-SESSION-DATA tags
 	SessionKeys         []*Key           // EXT-X-SESSION-KEY tags
 	ContentSteering     *ContentSteering // EXT-X-CONTENT-STEERING tag
+	Alternatives        []*Alternative   // EXT-X-MEDIA tags for alternative renditions (audio, video, subtitles)
 	buf                 bytes.Buffer     // buffer used for encoding and caching playlist
 	ver                 uint8            // protocol version of the playlist, 3 or higher
 	independentSegments bool             // Global tag for EXT-X-INDEPENDENT-SEGMENTS

@@ -82,6 +82,9 @@ func (p *MasterPlaylist) decode(buf *bytes.Buffer, strict bool) error {
 
 	p.attachRenditionsToVariants(state.alternatives)
 
+	// Store all alternatives in the master playlist
+	p.Alternatives = state.alternatives
+
 	if strict && !state.m3u {
 		return ErrExtM3UAbsent
 	}
