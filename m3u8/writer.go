@@ -167,7 +167,7 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	// Add alternatives from the master playlist (new approach)
 	for _, alt := range p.Alternatives {
 		if alt != nil {
-			key := fmt.Sprintf("%s-%s-%s-%s", alt.GroupId, alt.Type, alt.Name, alt.Language)
+			key := fmt.Sprintf("%s-%s-%s-%s-%s", alt.GroupId, alt.Type, alt.Name, alt.Language, alt.URI)
 			allAlts[key] = alt
 		}
 	}
@@ -176,7 +176,7 @@ func (p *MasterPlaylist) Encode() *bytes.Buffer {
 	for _, v := range p.Variants {
 		for _, alt := range v.Alternatives {
 			if alt != nil {
-				key := fmt.Sprintf("%s-%s-%s-%s", alt.GroupId, alt.Type, alt.Name, alt.Language)
+				key := fmt.Sprintf("%s-%s-%s-%s-%s", alt.GroupId, alt.Type, alt.Name, alt.Language, alt.URI)
 				allAlts[key] = alt
 			}
 		}
